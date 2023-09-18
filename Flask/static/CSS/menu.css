@@ -1,0 +1,43 @@
+nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+nav ul li {
+    display: inline-block;
+    position: relative;
+}
+.liPadre{
+    background-color: white;
+    color:black;
+    font-weight: bold;
+}
+
+nav ul li a {
+    text-decoration: none;
+    padding: 10px 20px;
+    background-color: #333;
+    display: block;
+}
+
+nav ul li:hover ul {
+    display: block;
+}
+
+nav ul li ul {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: #e65656;
+}
+
+nav ul li ul li {
+    display: block;
+}
+
+nav ul li ul li a {
+    padding: 10px 20px;
+    color: #fff;
+}
