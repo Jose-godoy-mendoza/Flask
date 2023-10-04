@@ -1,67 +1,58 @@
-from flask import Flask
-from flask import render_template, session, request, redirect
+from fastapi import FastAPI, Response
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import timedelta
+from flask_cors import CORS
 from conf.db import Connection
+from starlette.status import HTTP_400_BAD_REQUEST
+from pydantic import BaseModel
 
-app = Flask(__name__, template_folder='templates')
-app.config['SECRET_KEY'] = 'random'
 
-@app.route("/")
+class Draw_Menu(BaseModel):
+    Username: str
+    Menu: str
+
+
+app = FastAPI()
+
+
+@app.get("/")
 def Index():
-    return render_template("Login.html")
+    return {"prueba": "test"}
 
-@app.route("/Login", methods=["post"])
-def Login():
-    Username = request.form["username"]
-    Password = request.form["password"]
+
+@app.get("/api/prueba/<Username><Password>", response_model=Draw_Menu)
+def Login(Username:str, Password:str):
     SQLConnection = Connection.cursor()
-    SQLResult = SQLConnection.execute("select * from Users where  Username ='"+Username+"' and password = '"+Password+"';").fetchone()
-    Message = ""
+    GetRol = SQLConnection.execute("select * from Users where  Username ='"+Username+"';").fetchone()
+    JPassword = GetRol[2]
 
-    if SQLResult is not None:
-        Message = "Bienvenido"
-        session["IdRol"] = SQLResult[3]
-        return redirect("Menu")
+    if GetRol is not None:
+        if check_password_hash(JPassword, Password):
+            print(JPassword)
+            SQLConnection = Connection.cursor()
+
+            HTMLString = "<nav><ul>"
+            SQLResult = SQLConnection.execute("select * from Menu where  IdMenuPadre = 0 and IdRol ='"+ str(GetRol[3])+"';").fetchall()
+            for Menu in SQLResult:
+                idPadre = Menu[0]
+                HTMLString+="<li class=\"liPadre\"><a href=\""+Menu[3]+"\">"+Menu[1]+"</a>"
+                Menus = SQLConnection.execute("select * from Menu where  IdMenuPadre ='"+str(idPadre)+"' and IdRol ='"+ str(GetRol[3]) + "';").fetchall()
+
+                HTMLString+="<ul>"
+                for SubMenu in Menus:
+                    HTMLString += "<li><a href=\""+SubMenu[3]+"\">"+SubMenu[1]+"</a></li>"
+                    print(SubMenu)
+
+                HTMLString +="</ul>\n</li>"
+            HTMLString+="<li><a href=\"/salir\">Salir</a></li>"    
+            HTMLString +="</ul></nav>"
+            SQLConnection.close()
+            return {"Username" : GetRol[1], "Menu":HTMLString}
+        else:
+            SQLConnection.close()
+            return Response(status_code=HTTP_400_BAD_REQUEST) 
     else:
-        Message = "Error"
-    SQLConnection.close()
-    return render_template("Login.html", msg = Message)
+        SQLConnection.close()
+        return Response(status_code=HTTP_400_BAD_REQUEST) 
+    
 
-@app.route("/Menu")
-def Menu():
-    IdRol = session.get("IdRol")
-
-    SQLConnection = Connection.cursor()
-
-    HTMLString = "<nav><ul>"
-    SQLResult = SQLConnection.execute("select * from Menu where  IdMenuPadre = 0 and IdRol ='"+ str(IdRol)+"';").fetchall()
-    for Menu in SQLResult:
-        idPadre = Menu[0]
-        HTMLString+="<li class=\"liPadre\"><a href=\""+Menu[3]+"\">"+Menu[1]+"</a>"
-        Menus = SQLConnection.execute("select * from Menu where  IdMenuPadre ='"+str(idPadre)+"' and IdRol ='"+ str(IdRol) + "';").fetchall()
-
-        HTMLString+="<ul>"
-        for SubMenu in Menus:
-            HTMLString += "<li><a href=\""+SubMenu[3]+"\">"+SubMenu[1]+"</a></li>"
-            print(SubMenu)
-
-        HTMLString +="</ul>\n</li>"
-    HTMLString+="<li><a href=\"/salir\">Salir</a></li>"    
-    HTMLString +="</ul></nav>"
-
-
-    return render_template("testindex.html", pintar = HTMLString)
-
-@app.route("/salir")
-def Exit():
-    session.clear()
-    return redirect("/")
-
-
-@app.route("/caja")
-def caja():
-    return render_template("cajas.html")
-
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
