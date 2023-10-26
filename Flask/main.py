@@ -87,7 +87,7 @@ def list():
             HTMLString+= "<tr>"
             HTMLString+="<td>"+str(Banks[0])+"</td>"
             HTMLString+="<td>"+Banks[1]+"</td>"
-            HTMLString +="<td> <a class=\"btn btn-success\">Edit</a> | <a class=\"btn btn-danger\">Delete</a> </td>"
+            HTMLString +="<td> <a class=\"btn btn-success\">Edit</a> | <a href=\"/Delete_Bank\"class=\"btn btn-danger\">Delete</a> </td>"
             HTMLString +="</tr>"
 
             DropDown_Banks += "<option>"+Banks[1]+"</option>"
@@ -335,3 +335,108 @@ def Update(IdTransaccion: str, Beneficiario: str, Banco_Beneficiario: str, Monto
         return {"Remitente":Remitente, "Mensaje":Comentario}
     except ValidationError as exc:
         print(repr(exc.errors()[0]['type']))
+
+
+
+
+@app.get("/api/show_accounts")
+def show_accounts():
+    Oracle_Connection = OracleConnection.cursor()
+    Transaction_list = Oracle_Connection.execute("""
+    select cuentas.IdCuenta, cuentas.saldo, personas.Nombre, personas.apellido, bancos.Nombre
+    from cuentas
+    INNER JOIN personas
+    ON cuentas.dpi = personas.dpi
+    INNER JOIN bancos
+    ON cuentas.idbanco = Bancos.idbanco
+                                          """).fetchall()
+    
+    HTMLString=""
+    if Transaction_list is not None:
+        
+        for Trx in Transaction_list:
+            HTMLString+= "<tr>"
+            HTMLString+="<td>"+str(Trx[0])+"</td>"
+            HTMLString+="<td>"+str(Trx[1])+"</td>"
+            HTMLString+="<td>"+str(Trx[2])+"</td>"
+            HTMLString+="<td>"+str(Trx[3])+"</td>"
+            HTMLString+="<td>"+str(Trx[4])+"</td>"
+            HTMLString +="<td> <a class=\"btn btn-success\">Edit</a> | <a href=\"/Delete_Transaction\" class=\"btn btn-danger\">Delete</a> </td>"
+            HTMLString +="</tr>"            
+        Oracle_Connection.close()
+        return {"Accounts_List":HTMLString}
+    else:
+        Oracle_Connection.close()
+        return Response(status_code=HTTP_400_BAD_REQUEST)
+    
+
+
+
+
+@app.post("/api/insert_Account/<IdCuenta><Saldo><DPI><IdBanco>")
+def Insert_Account(IdCuenta:str, Saldo:str, DPI:str, IdBanco:str):
+    try:
+        Oracle_Connection = OracleConnection.cursor()
+        Oracle_Connection.execute("insert into Cuentas values ("+IdCuenta+", '"+Saldo+"', '"+DPI+"', '"+IdBanco+"')")
+        OracleConnection.commit()
+    except cx_Oracle.DatabaseError as e:
+        print("Error al ejecutar la consulta de inserción:", e)
+    return {"IdCuenta":IdCuenta}
+
+
+@app.delete("/api/delete_Account/<IdCuenta>")
+def Delete_Account(IdCuenta:str):
+    try:
+        Oracle_Connection = OracleConnection.cursor()
+        Oracle_Connection.execute("delete from cuentas where IdCuenta= '"+IdCuenta+"'")
+        OracleConnection.commit()
+    except cx_Oracle.DatabaseError as e:
+        print("Error al ejecutar la consulta de delete:", e)
+
+@app.post("/api/update_Account/<IdCuenta><Saldo><DPI><IdBanco>")
+def Update_Account(IdCuenta:str, Saldo:str, DPI:str, IdBanco:str):
+    try:
+        Oracle_Connection = OracleConnection.cursor()
+        Oracle_Connection.execute("update Cuentas set Saldo = '"+Saldo+"', DPI = '"+DPI+"', IdBanco='"+IdBanco+"' where IdCuenta= '"+IdCuenta+"'")
+        OracleConnection.commit()
+    except cx_Oracle.DatabaseError as e:
+        print("Error al ejecutar la consulta de delete:", e)
+
+
+
+@app.get("/api/historial_cuentas/<Cuenta>")
+def show_account_history(Cuenta:str):
+    Default = " "
+    Oracle_Connection = OracleConnection.cursor()
+    Transaction_list = Oracle_Connection.execute("""
+    select transacciones.fecha, tipo_transaccion.descripcion, transacciones.cuenta_beneficiaria, 
+    transacciones.idcuenta_remitente, transacciones.monto, transacciones.comentario 
+    from transacciones 
+    INNER JOIN tipo_transaccion
+    ON transacciones.idtipo_transaccion = tipo_transaccion.idtipo_transaccion
+    where cuenta_beneficiaria= """+str(Cuenta)+""" or idcuenta_remitente="""+str(Cuenta)+"""
+    ORDER BY transacciones.fecha""").fetchall()
+    
+    HTMLString=""
+    if Transaction_list is not None:
+        
+        for Trx in Transaction_list:
+            HTMLString+= "<tr>"
+            HTMLString+="<td>"+str(Trx[0])+"</td>"
+            HTMLString+="<td>"+str(Trx[1])+"</td>"
+            if str(Trx[2]) == str(Cuenta):
+                HTMLString+="<td>"+str(Trx[4])+"</td>"
+            else:
+                HTMLString+="<td>"+str(Default)+"</td>"
+            if str(Trx[3]) == str(Cuenta):
+                HTMLString+="<td> -"+str(Trx[4])+"</td>"
+            else:
+                HTMLString+="<td>"+str(Default)+"</td>"
+            
+            HTMLString+="<td>"+str(Trx[5])+"</td>"
+            HTMLString +="</tr>"            
+        Oracle_Connection.close()
+        return {"Account_History":HTMLString}
+    else:
+        Oracle_Connection.close()
+        return Response(status_code=HTTP_400_BAD_REQUEST)
